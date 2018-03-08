@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>分析するマン</title>
+
+  <script type="text/javascript" language="javascript">
+// 定数などの定義
+  var cornerSticker = [["え","り","く"],//0
+                       ["あ","き","す"],//1
+                       ["い","し","つ"],//2
+                       ["う","ち","る"],//3
+                       ["む","け","ら"],//4
+                       ["み","せ","か"],//5
+                       ["ま","て","さ"],//6
+                       ["め","れ","た"]];//7
+
+  var edgeSticker   = [["あ","く"],//0
+                       ["い","す"],//1
+                       ["う","つ"],//2
+                       ["え","る"],//3
+                       ["り","け"],//4
+                       ["せ","き"],//5
+                       ["し","て"],//6
+                       ["れ","ち"],//7
+                       ["む","か"],//8
+                       ["み","さ"],//9
+                       ["ま","た"],//10
+                       ["め","ら"]];//11
+
+  var cornerBufferList = [{p:4,o:0},{p:0,o:1},{}];
+  var edgeBufferList = [{p:8, o:0},{p:10, o:0},{p:4,o:0}];
+  var koukanFlag = false;
+  var koukanAnalyze = [{p:8, o:0}, {p:4, o:0}];
+
+  function Cube(){
+    this.corner = {p:[0,1,2,3,4,5,6,7], o:[0,0,0,0,0,0,0,0]};
+    this.edge = {p:[0,1,2,3,4,5,6,7,8,9,10,11], o:[0,0,0,0,0,0,0,0,0,0,0,0]};
+  }
+// ここからクッキー☆処理  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  // cookieの基本操作関数
+  function cookie_push(key,value,date = 365){
+    if(navigator.cookieEnabled){
+      var cookie_name = encodeURIComponent( key );
+      var cookie_value = encodeURIComponent( value );
+      var expire_date = new Date();
+      expire_date.setTime(expire_date.getTime() + date*24*60*60*1000);
+      document.cookie = cookie_name + "=" + cookie_value + "; expires=" + expire_date.toGMTString();
+      console.log(key + " = " + value + " resistered.");
+    }
+  }
+
+  function cookie_delete(key){
+    if(navigator.cookieEnabled){
+      var dummy_date = new Date();
+      dummy_date.setTime(dummy_date.getTime() - 1000);
+      var cookie_name = encodeURIComponent( key );
+      document.cookie = cookie_name + "=; expires=" + dummy_date.toGMTString();
+      console.log(key + " deleted.");
+    }
+  }
+
+  function cookie_delete_all(){
+    if(navigator.cookieEnabled){
+      hash_cookies = cookie_getHush();
+      for(var hash_key in hash_cookies){
+        cookie_delete(hash_key);
+      }
+    }
+  }
+
+  function cookie_getHush(){
+    if(navigator.cookieEnabled){
+      var full_cookie_data = document.cookie;
+      var array_cookies = full_cookie_data.split(";");
+      var hash_cookies = new Array();
+      for(var i=0; i<array_cookies.length; i++){
+        array_cookies[i] = array_cookies[i].replace(/^ +| +$/,'');
+        var tmp = array_cookies[i].split("=");
+        hash_cookies[decodeURIComponent(tmp[0])] = decodeURIComponent(tmp[1]);
+      }
+      return hash_cookies;
+    }else{
+      return {};
+    }
+  }
+
+  function cookie_get(key,hash){
+    if(navigator.cookieEnabled){
+      return hash[key];
+    }
+  }
+
+  // 設定読み込み
+  function config_get(){
+    var cook = cookie_getHush();
+    var flag = cookie_get("F",cook);
+    if(flag === "t"){
+      // こーなーれたー
+      var cornerLetters = cookie_get("L_C",cook)
+      var counter = 0;
+      for (var i = 0; i < 8; i++) {
+        for(var j = 0; j < 3; j++) {
+          document.getElementById("corner"+i+j).value = cornerLetters.charAt(counter);
+          counter++;
+        }
+      }
+
+      // えっじれたー
+      var edgeLetters = cookie_get("L_E",cook)
+      var counter = 0;
+      for (var i = 0; i < 12; i++) {
+        for(var j = 0; j < 2; j++) {
+          document.getElementById("edge"+i+j).value = edgeLetters.charAt(counter);
+          counter++;
+        }
+      }
+
+      // バッファーリスト
+      document.getElementById("cornerBufferRank").value = cookie_get("B_C",cook);
+      document.getElementById("edgeBufferRank").value = cookie_get("B_E",cook);
+      // 交換分析
+      document.getElementById("koukan").koukanRadio.value = cookie_get("KK",cook);
+      var kl = cookie_get("KL",cook);
+      document.getElementById("koukan0").value = kkl.charAt(0);
+      document.getElementById("koukan1").value = kkl.charAt(1);
+
+    }
+  }
+  // 設定保存 保存タイミングはApply時とExec時
+  function config_save(){
+    cookie_push("F","t");
+    // こーなーれたー
+    var cornerLetters = "";
+    for (var i = 0; i < 8; i++) {
+      for(var j = 0; j < 3; j++) {
+        cornerLetters += cornerSticker[i][j];
+      }
+    }
+    cookie_push("L_C",cornerLetters);
+    // えっじれたー
+    var edgeLetters = "";
+    for (var i = 0; i < 12; i++) {
+      for(var j = 0; j < 2; j++) {
+        edgeLetters += edgeSticker[i][j];
+      }
+    }
+    cookie_push("L_E",edgeLetters);
+    // バッファーリスト
+    var bc = document.getElementById("cornerBufferRank").value;
+    cookie_push("B_C",bc);
+    var be = document.getElementById("edgeBufferRank").value;
+    cookie_push("B_E",be);
+    // 交換分析
+    var koukan = document.getElementById("koukan").koukanRadio.value;
+    cookie_push("KK",koukan);
+    var koukanLetter = document.getElementById("koukan0").value + document.getElementById("koukan1").value;
+    cookie_push("KL",koukanLetter);
+  }
+// ここまでクッキー☆処理  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+// ここからスクランブラ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+        // 回転の定義
+        var r = 0;
+        var u = 1;
+        var f = 2;
+        var l = 3;
+        var d = 4;
+        var b = 5;
+        var r2 = 6;
+        var u2 = 7;
+        var f2 = 8;
+        var l2 = 9;
+        var d2 = 10;
+        var b2 = 11;
+        var rp = 12;
+        var up = 13;
+        var fp = 14;
+        var lp = 15;
+        var dp = 16;
+        var bp = 17;
+
+        var turnlist = {
+          "R" : r, "U" : u, "F" : f, "L" : l, "D" : d, "B" : b,
+          "R2" : r2, "U2" : u2, "F2" : f2, "L2" : l2, "D2" : d2, "B2" : b2,
+          "R\'" : rp, "U\'" : up, "F\'" : fp, "L\'" : lp, "D\'" : dp, "B\'" : bp
+        }
+
+        var turn = [];
+        turn[r] = new Cube();
+        turn[r].corner.p = [4,1,2,0,7,5,6,3];
+        turn[r].corner.o = [1,0,0,2,2,0,0,1];
+        turn[r].edge.p   = [0,1,2,4,11,5,6,3,8,9,10,7];
+        turn[r].edge.o   = [0,0,0,1,1,0,0,1,0,0,0,1];
+        turn[u] = new Cube();
+        turn[u].corner.p = [3,0,1,2,4,5,6,7];
+        turn[u].corner.o = [0,0,0,0,0,0,0,0];
+        turn[u].edge.p   = [3,0,1,2,4,5,6,7,8,9,10,11];
+        turn[u].edge.o   = [0,0,0,0,0,0,0,0,0,0,0,0];
+        turn[l] = new Cube();
+        turn[l].corner.p = [0,2,6,3,4,1,5,7];
+        turn[l].corner.o = [0,2,1,0,0,1,2,0];
+        turn[l].edge.p   = [0,6,2,3,4,1,9,7,8,5,10,11];
+        turn[l].edge.o   = [0,1,0,0,0,1,1,0,0,1,0,0];
+        turn[f] = new Cube();
+        turn[f].corner.p = [1,5,2,3,0,4,6,7];
+        turn[f].corner.o = [2,1,0,0,1,2,0,0];
+        turn[f].edge.p   = [5,1,2,3,0,8,6,7,4,9,10,11];
+        turn[f].edge.o   = [0,0,0,0,0,0,0,0,0,0,0,0];
+        turn[d] = new Cube();
+        turn[d].corner.p = [0,1,2,3,5,6,7,4];
+        turn[d].corner.o = [0,0,0,0,0,0,0,0];
+        turn[d].edge.p   = [0,1,2,3,4,5,6,7,9,10,11,8];
+        turn[d].edge.o   = [0,0,0,0,0,0,0,0,0,0,0,0];
+        turn[b] = new Cube();
+        turn[b].corner.p = [0,1,3,7,4,5,2,6];
+        turn[b].corner.o = [0,0,2,1,0,0,1,2];
+        turn[b].edge.p   = [0,1,7,3,4,5,2,10,8,9,6,11];
+        turn[b].edge.o   = [0,0,0,0,0,0,0,0,0,0,0,0];
+
+        // Cube の回転
+        // 使い方 : Rの回転を表す turn[r] を引数として cube.turn.(turn[r]) とすると、
+        //         cubeがRされる
+        Cube.prototype.turn = function(cube2){
+          var newCO = [];
+          for (var i = 0;i < this.corner.o.length;i++){
+            newCO[i] = (cube2.corner.o[i] + this.corner.o[cube2.corner.p[i]]) % 3;
+          }
+          this.corner.o = newCO;
+
+          var newEO = [];
+          for (var i = 0;i < this.edge.o.length;i++){
+            newEO[i] = (cube2.edge.o[i] + this.edge.o[cube2.edge.p[i]]) % 2;
+          }
+          this.edge.o = newEO;
+
+          var newCP = [];
+          for (var i = 0;i < this.corner.p.length;i++){
+            newCP[i] = this.corner.p[cube2.corner.p[i]];
+          }
+          this.corner.p = newCP;
+
+          var newEP = [];
+          for (var i = 0;i < this.edge.p.length;i++){
+            newEP[i] = this.edge.p[cube2.edge.p[i]];
+          }
+          this.edge.p = newEP;
+        }
+
+        // スクランブルの文字列を受け取ってキューブをスクランブルする
+        Cube.prototype.scramble = function(scr){
+          splitScramble = scr.split(" ");
+          var turnNumber;
+          for(var i = 0; i < splitScramble.length;i++){
+            turnNumber = turnlist[splitScramble[i]];
+            if(turnNumber != undefined){
+              this.turn(turn[turnNumber]);
+            }
+          }
+
+        }
+
+        // r2 系, rp 系の回転の生成
+        turn[r2] = new Cube();
+        turn[r2].scramble("R R");
+        turn[u2] = new Cube();
+        turn[u2].scramble("U U");
+        turn[f2] = new Cube();
+        turn[f2].scramble("F F");
+        turn[l2] = new Cube();
+        turn[l2].scramble("L L");
+        turn[d2] = new Cube();
+        turn[d2].scramble("D D");
+        turn[b2] = new Cube();
+        turn[b2].scramble("B B");
+
+        turn[rp] = new Cube();
+        turn[rp].scramble("R R R");
+        turn[up] = new Cube();
+        turn[up].scramble("U U U");
+        turn[fp] = new Cube();
+        turn[fp].scramble("F F F");
+        turn[lp] = new Cube();
+        turn[lp].scramble("L L L");
+        turn[dp] = new Cube();
+        turn[dp].scramble("D D D");
+        turn[bp] = new Cube();
+        turn[bp].scramble("B B B");
+// ここまでスクランブラ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ここから分析 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // Corner analyze
+      // buffer から一周分析
+      function analyzeCornerSub(corner,buffer,cornerFlags,firstbuffer){
+        var mod = 3;
+        var ans = "";
+
+        cornerFlags[buffer.p] = false;
+        if(!firstbuffer) ans += cornerSticker[buffer.p][buffer.o];
+        var q_o = (buffer.o + corner.o[buffer.p]) % mod;
+        var q_p = corner.p[buffer.p];
+
+        while(q_p != buffer.p){
+          cornerFlags[q_p] = false;
+          ans += cornerSticker[q_p][q_o];
+          q_o = (q_o + corner.o[q_p]) % mod;
+          q_p = (corner.p[q_p]);
+        }
+        if(!firstbuffer) ans += cornerSticker[q_p][q_o];
+        return ans;
+      }
+
+      function analyzeCorner(corner){
+        var cornerFlags = [true,true,true,true,true,true,true,true];
+        var ans = "";
+        var buffer;
+        var firstBufferFlag = true;
+        for(var i = 0;i < cornerBufferList.length;i++){
+          buffer = cornerBufferList[i]
+          if (cornerFlags[buffer.p]) {
+            if(corner.p[buffer.p] != buffer.p){
+              ans += analyzeCornerSub(corner,buffer,cornerFlags,firstBufferFlag);
+            }else{
+              // CO処理
+            }
+          }
+          firstBufferFlag = false;
+        }
+        return {loop: ans, o:"しーおー"};
+      }
+
+      // Edge analyze
+      // buffer から一周分析
+      function analyzeEdgeSub(edge,buffer,edgeFlags,firstbuffer){
+        var mod = 2;
+        var ans = "";
+
+        edgeFlags[buffer.p] = false;
+        if(!firstbuffer) ans += edgeSticker[buffer.p][buffer.o];
+        var q_o = (buffer.o + edge.o[buffer.p]) % mod;
+        var q_p = edge.p[buffer.p];
+
+        while(q_p != buffer.p){
+          edgeFlags[q_p] = false;
+          ans += edgeSticker[q_p][q_o];
+          q_o = (q_o + edge.o[q_p]) % mod;
+          q_p = (edge.p[q_p]);
+        }
+        if(!firstbuffer) ans += edgeSticker[q_p][q_o];
+        return ans;
+      }
+
+      function analyzeEdge(edge){
+        var edgeFlags = [true,true,true,true,true,true,true,true,true,true,true,true];
+        var ans = "";
+        var buffer;
+        var firstBufferFlag = true;
+        for(var i = 0;i < edgeBufferList.length;i++){
+          buffer = edgeBufferList[i]
+          if (edgeFlags[buffer.p]) {
+            if(edge.p[buffer.p] != buffer.p){
+              ans += analyzeEdgeSub(edge,buffer,edgeFlags,firstBufferFlag);
+            }else{
+              // EO処理
+            }
+          }
+          firstBufferFlag = false;
+        }
+        return {loop: ans, o:"いーおー"};
+      }
+
+      // parity判定
+      function parityCheck(analyzedCorner){
+        return analyzedCorner.loop.length % 2 == 1;
+      }
+
+
+      Cube.prototype.analyze = function(){
+        var analyzedCorner = analyzeCorner(this.corner);
+        var parity = parityCheck(analyzedCorner);
+        if(koukanFlag == true){// 交換分析法を使用するかどうか
+          if (parity) {
+            // 交換分析法
+            console.log("koukan");
+            changedEdge = {p:[],o:[]};
+            changedEdge.p = this.edge.p.concat(); // edgeを複製
+            changedEdge.o = this.edge.o.concat();
+
+            // 場所交換
+            nejire = koukanAnalyze[0].o - koukanAnalyze[1].o;
+            changedEdge.p[this.edge.p.indexOf(koukanAnalyze[0].p)] = koukanAnalyze[1].p;
+            changedEdge.p[this.edge.p.indexOf(koukanAnalyze[1].p)] = koukanAnalyze[0].p;
+            changedEdge.o[this.edge.p.indexOf(koukanAnalyze[0].p)] += nejire;
+            changedEdge.o[this.edge.p.indexOf(koukanAnalyze[0].p)] %= 2;
+            changedEdge.o[this.edge.p.indexOf(koukanAnalyze[1].p)] += nejire;
+            changedEdge.o[this.edge.p.indexOf(koukanAnalyze[1].p)] %= 2;
+
+            var analyzedEdge = analyzeEdge(changedEdge);
+
+            return {corner : analyzedCorner,
+                    edge : analyzedEdge,
+                    parity: parity
+                    }
+          }else{
+            var analyzedEdge = analyzeEdge(this.edge);
+
+            return {corner : analyzedCorner,
+                    edge : analyzedEdge,
+                    parity: parity
+                    }
+          }
+        }else{
+          var analyzedEdge = analyzeEdge(this.edge,edgeBufferList);
+
+          return {corner : analyzedCorner,
+                  edge : analyzedEdge,
+                  parity: parity
+                  }
+        }
+      }
+// ここまで分析 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ぼたん
+      //Execが押されると実行
+      function main(tx1){
+        var cube = new Cube();
+        var scr = tx1;
+        console.log(tx1);
+        cube.scramble(tx1);
+        var ans = cube.analyze();
+        console.log(cube);
+        console.log(ans);
+
+        return ans;
+      }
+
+      function onButtonClickExec(){
+        applyAll();
+        var target = document.getElementById("output");
+        var str = document.getElementById("id_tx1").value;
+        var ans = main(str);
+        // document.getElementById("id_tx1").value = "L L";
+        target.innerHTML = "CornerLoop : " + ans.corner.loop + "<br>"
+                         + "EdgeLoop   : " + ans.edge.loop + "<br>"
+                         + "Parity : " + ans.parity + "<br>";
+      }
+
+      function onButtonClickConfig(){
+        var config = document.getElementById("config_form");
+        if(config.style.display === "none"){
+          config.style.display = "inline";
+        }else{
+          config.style.display = "none";
+        }
+      }
+
+      function onButtonClickConfigApply(){// 設定適用
+        applyAll();
+      }
+      function onButtonClickConfigReset(){// 設定適用
+        cookie_delete_all();
+        location.reload();
+      }
+
+// apply
+      // configを適用してcookieに保存
+      function applyAll(){
+        applySticker();
+        applyBufferRank();
+        applyKoukan();
+        config_save();
+      }
+
+      function applyBufferRank(){
+        var buffer;
+
+        var cornerBufferRank = document.getElementById("cornerBufferRank").value;
+        var cornerBufferRankList = cornerBufferRank.split('');
+        var cornerFlags = [false,false,false,false,false,false,false,false];
+        cornerBufferList = [];
+        for (var i = 0; i < cornerBufferRankList.length; i++) {
+          buffer = sticker_to_corner(cornerBufferRankList[i]);
+          if(buffer.p !== undefined){
+            if(cornerFlags[buffer.p] === false){
+              cornerFlags[buffer.p] = true;
+              cornerBufferList.push(buffer);
+            }
+          }
+        }
+
+        var edgeBufferRank = document.getElementById("edgeBufferRank").value;
+        var edgeBufferRankList = edgeBufferRank.split('');
+        edgeFlags = [false,false,false,false,false,false,false,false,false,false,false,false];
+        edgeBufferList = [];
+        for (var i = 0; i < edgeBufferRankList.length; i++) {
+          buffer = sticker_to_edge(edgeBufferRankList[i]);
+          if(buffer.p!==undefined){
+            if(edgeFlags[buffer.p] === false){
+              edgeFlags[buffer.p] = true;
+              edgeBufferList[i] = buffer;
+            }
+          }
+        }
+
+        if(cornerBufferList.length !== 8){
+          for (var i = 0; i < 8; i++) {
+            // {p:i, o:*} がbufferListになければ{p:i,o:0}を追加
+            if(cornerFlags[i] === false){
+              cornerBufferList.push({p:i, o:0});
+            }
+          }
+        }
+
+        if(edgeBufferList.length !== 12){
+          for (var i = 0; i < 12; i++) {
+            // {p:i, o:*} がbufferListになければ{p:i,o:0}を追加
+            if(edgeFlags[i] === false){
+              edgeBufferList.push({p:i, o:0});
+            }
+          }
+        }
+      }
+
+
+      function applyKoukan(){
+        var newKoukanFlag = document.getElementById("koukan");
+        koukanFlag = (newKoukanFlag.koukanRadio.value === "true");
+        var koukan0 = document.getElementById("koukan0").value;
+        var koukan1 = document.getElementById("koukan1").value;
+        k0 = sticker_to_edge(koukan0);
+        k1 = sticker_to_edge(koukan1);
+        koukanAnalyze[0].p = k0.p;
+        koukanAnalyze[0].o = k0.o;
+        koukanAnalyze[1].p = k1.p;
+        koukanAnalyze[1].o = k1.o;
+      }
+
+      function applySticker(){
+        // cornerSticker 再登録
+        for(var i = 0;i < 8;i++){
+          for (var j = 0; j < 3; j++) {
+            var newCornerLetter = document.getElementById("corner" + i + j).value;
+            if(newCornerLetter != ""){
+              cornerSticker[i][j] = newCornerLetter;
+            }
+          }
+        }
+        // edgeSticker 再登録
+        for(var i = 0;i < 12;i++){
+          for (var j = 0; j < 2; j++) {
+            var newEdgeLetter = document.getElementById("edge" + i + j).value;
+            if(newEdgeLetter != ""){
+              edgeSticker[i][j] = newEdgeLetter;
+            }
+          }
+        }
+      }
+// らいぶらり
+    function sticker_to_corner(str){
+      var _p;
+      var _o;
+      for(var i = 0; i < 8; i++){
+        for(var j = 0; j < 3; j++){
+          if(str === cornerSticker[i][j]){
+            _p = i;
+            _o = j;
+          }
+        }
+      }
+      return {p : _p, o : _o};
+    }
+
+    function sticker_to_edge(str){
+      var _p;
+      var _o;
+      for(var i = 0; i < 12; i++){
+        for(var j = 0; j < 2; j++){
+          if(str === edgeSticker[i][j]){
+            _p = i;
+            _o = j;
+          }
+        }
+      }
+      return {p : _p, o : _o};
+    }
+  </script>
+
+</head>
+<body>
+  <form name="form1" id="id_form1" action="">
+    スクランブル入力<br>
+    <input name="textBox1" id="id_tx1" type="text" value="R" />
+    <input name="dummy" type="text" value="" style = "display:none"/>
+    <input type="button" value="Exec" onclick="onButtonClickExec();" />
+  </form>
+  <hr/>
+  <div id="output"></div>
+  <hr/>
+  <div id="config" >
+    <input type="button" value="Config" onclick="onButtonClickConfig();" />
+    <div id="config_form" class="forms" style="display:none">
+      <form name="form1" action="" >
+        ・レター変更<br>
+        <style>
+          table {
+          	border-collapse: collapse;
+          }
+          td {
+          	border: solid 1px;
+          	padding: 0.5em;
+          }
+          .U {}
+          .F {background:green;}
+          .R {background:crimson;}
+          .L {background:darkorange;}
+          .B {background:RoyalBlue;}
+          .D {background:gold;}
+        </style>
+<!-- table start ================================================================ -->
+<table>
+	<tbody>
+		<tr>
+			<td colspan="3" rowspan="3" id="null0" class="null"></td>
+			<td class="U"><input name="ULB" id="corner20" type="text" size="2" value="い"/></td>
+			<td class="U"><input name="UB" id="edge20" type="text" size="2" value="う"/></td>
+			<td class="U"><input name="URB" id="corner30" type="text" size="2" value="う"/></td>
+			<td colspan="6" rowspan="3" id="null1" class="null"></td>
+		</tr>
+		<tr>
+			<td class="U"><input name="UL" id="edge10" type="text" size="2" value="い"/></td>
+			<td class="U">U</td>
+			<td class="U"><input name="UR" id="edge30" type="text" size="2" value="え"/></td>
+		</tr>
+		<tr>
+			<td class="U"><input name="ULF" id="corner10" type="text" size="2" value="あ"/></td>
+			<td class="U"><input name="UF" id="edge00" type="text" size="2" value="あ"/></td>
+			<td class="U"><input name="URF" id="corner00" type="text" size="2" value="え"/></td>
+		</tr>
+		<tr>
+			<td class="L"><input name="LUB" id="corner21" type="text" size="2" value="し"/></td>
+			<td class="L"><input name="LU" id="edge11" type="text" size="2" value="す"/></td>
+			<td class="L"><input name="LUF" id="corner12" type="text" size="2" value="す"/></td>
+			<td class="F"><input name="FUL" id="corner11" type="text" size="2" value="き"/></td>
+			<td class="F"><input name="FU" id="edge01" type="text" size="2" value="く"/></td>
+			<td class="F"><input name="FUR" id="corner02" type="text" size="2" value="く"/></td>
+			<td class="R"><input name="RUF" id="corner01" type="text" size="2" value="り"/></td>
+			<td class="R"><input name="RU" id="edge31" type="text" size="2" value="る"/></td>
+			<td class="R"><input name="RUB" id="corner32" type="text" size="2" value="る"/></td>
+			<td class="B"><input name="BUR" id="corner31" type="text" size="2" value="ち"/></td>
+			<td class="B"><input name="BU" id="edge21" type="text" size="2" value="つ"/></td>
+			<td class="B"><input name="BUL" id="corner22" type="text" size="2" value="つ"/></td>
+		</tr>
+		<tr>
+			<td class="L"><input name="LB" id="edge60" type="text" size="2" value="し"/></td>
+			<td class="L">L</td>
+			<td class="L"><input name="LF" id="edge50" type="text" size="2" value="せ"/></td>
+			<td class="F"><input name="FL" id="edge51" type="text" size="2" value="き"/></td>
+			<td class="F">F</td>
+			<td class="F"><input name="FR" id="edge41" type="text" size="2" value="け"/></td>
+			<td class="R"><input name="RF" id="edge40" type="text" size="2" value="り"/></td>
+			<td class="R">R</td>
+			<td class="R"><input name="RB" id="edge70" type="text" size="2" value="れ"/></td>
+			<td class="B"><input name="BR" id="edge71" type="text" size="2" value="ち"/></td>
+			<td class="B">B</td>
+			<td class="B"><input name="BL" id="edge61" type="text" size="2" value="て"/></td>
+		</tr>
+		<tr>
+			<td class="L"><input name="LDB" id="corner62" type="text" size="2" value="さ"/></td>
+			<td class="L"><input name="LD" id="edge91" type="text" size="2" value="さ"/></td>
+			<td class="L"><input name="LDF" id="corner51" type="text" size="2" value="せ"/></td>
+			<td class="F"><input name="FDL" id="corner52" type="text" size="2" value="か"/></td>
+			<td class="F"><input name="FD" id="edge81" type="text" size="2" value="か"/></td>
+			<td class="F"><input name="FDR" id="corner41" type="text" size="2" value="け"/></td>
+			<td class="R"><input name="RDF" id="corner42" type="text" size="2" value="ら"/></td>
+			<td class="R"><input name="RD" id="edge111" type="text" size="2" value="ら"/></td>
+			<td class="R"><input name="RDB" id="corner71" type="text" size="2" value="れ"/></td>
+			<td class="B"><input name="BDR" id="corner72" type="text" size="2" value="た"/></td>
+			<td class="B"><input name="BD" id="edge101" type="text" size="2" value="た"/></td>
+			<td class="B"><input name="BDL" id="corner61" type="text" size="2" value="て"/></td>
+		</tr>
+		<tr>
+			<td colspan="3" rowspan="3" id="null2" class="null"></td>
+			<td class="D"><input name="DLF" id="corner50" type="text" size="2" value="み"/></td>
+			<td class="D"><input name="DF" id="edge80" type="text" size="2" value="む"/></td>
+			<td class="D"><input name="DRF" id="corner40" type="text" size="2" value="む"/></td>
+			<td colspan="6" rowspan="3" id="null3" class="null"></td>
+		</tr>
+		<tr>
+			<td class="D"><input name="DL" id="edge90" type="text" size="2" value="み"/></td>
+			<td class="D">D</td>
+			<td class="D"><input name="DR" id="edge110" type="text" size="2" value="め"/></td>
+		</tr>
+		<tr>
+			<td class="D"><input name="DLB" id="corner60" type="text" size="2" value="ま"/></td>
+			<td class="D"><input name="DB" id="edge100" type="text" size="2" value="ま"/></td>
+			<td class="D"><input name="DRB" id="corner70" type="text" size="2" value="め"/></td>
+		</tr>
+	</tbody>
+</table>
+<!-- table end   ================================================================ -->
+      </form>
+      <br>
+      <form id="bufferRank">
+        ・バッファの優先順位<br>
+        バッファにする優先順位が高い順にステッカーを入力<br>
+        ※初めのバッファは必須<br>
+        コーナー<input id="cornerBufferRank" type="text" value="むまめりするしみ" />
+        エッジ<input id="edgeBufferRank" type="text" value="むういえあましれみめ" />
+      </form>
+        <br>
+        <form id="koukan">
+          ・交換分析法<br>
+          <input type="radio" name="koukanRadio" value="true">ON
+          <input type="radio" name="koukanRadio" value="false" checked>OFF
+          <br>
+          入れ替える二つのステッカーを入力<br>
+          1<input id="koukan0" type="text" value="む" />
+          <br>
+          2<input id="koukan1" type="text" value="り"/><br>
+        </form>
+
+        <input type="button" value="Apply" onclick="onButtonClickConfigApply();" />
+        <input type="button" value="Reset" onclick="onButtonClickConfigReset();" />
+    </div>
+  </div>
+</body>
+<script>config_get();</script>
+</html>
